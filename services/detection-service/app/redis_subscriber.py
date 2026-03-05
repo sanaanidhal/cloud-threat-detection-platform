@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 import psycopg2
 from collections import defaultdict
 from datetime import datetime, timedelta
+from app.ml_model import predict_anomaly
+from app.metrics import logs_processed
+from app.metrics import alerts_triggered
 
 load_dotenv()
 
@@ -16,6 +19,7 @@ r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
 # Track activity
 ip_activity = defaultdict(list)
+
 
 def start_subscriber():
     pubsub = r.pubsub()
@@ -38,9 +42,18 @@ def process_log(log_data):
         "timestamp": timestamp
     })
 
+    # Clean old entries 
+    ip_activity[source_ip] = [
+        entry for entry in ip_activity[source_ip]
+        if entry["timestamp"] > timestamp - timedelta(seconds=30)
+    ]
+
     detect_port_scan(source_ip)
     detect_bruteforce(source_ip)
     detect_large_transfer(source_ip, bytes_sent)
+    detect_ml_anomaly(source_ip, port, bytes_sent)
+
+    logs_processed.inc()
 
 
 def detect_port_scan(ip):
@@ -65,6 +78,11 @@ def create_alert(source_ip, alert_type, severity):
     )
 
     conn.commit()
+    alerts_triggered.labels(
+    severity=severity,
+    type=alert_type
+    ).inc()
+    
     print("ALERT INSERTED INTO DB")
     cur.close()
     conn.close()
@@ -85,4 +103,21 @@ def detect_large_transfer(ip, bytes_sent):
     if bytes_sent > 5000:
         print(f"🚨 LARGE DATA TRANSFER from {ip}")
         create_alert(ip, "LARGE_DATA_TRANSFER", "MEDIUM")
-  
+
+def detect_ml_anomaly(ip, port, bytes_sent):
+
+    now = datetime.utcnow()
+
+    # requests in last 10 seconds
+    recent_requests = [
+        entry for entry in ip_activity[ip]
+        if entry["timestamp"] > now - timedelta(seconds=10)
+    ]
+
+    request_rate = len(recent_requests)
+
+    is_anomaly = predict_anomaly(port, bytes_sent, request_rate)
+
+    if is_anomaly:
+        print(f"🚨 ML ANOMALY DETECTED from {ip}")
+        create_alert(ip, "ML_ANOMALY", "MEDIUM")

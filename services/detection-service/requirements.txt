@@ -3,3 +3,8 @@ fastapi
 uvicorn
 python-dotenv
 psycopg[binary]
+scikit-learn
+pandas
+numpy
+prometheus-client
+joblib

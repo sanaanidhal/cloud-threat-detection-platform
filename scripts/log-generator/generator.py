@@ -1,10 +1,12 @@
-from faker import Faker 
+from faker import Faker  # type: ignore
 import random
 from datetime import datetime
 import json
 import time
+import requests
 
 fake = Faker()
+API_URL = "http://127.0.0.1:8000/logs"
 
 def generate_normal_log():
     return {
@@ -36,6 +38,12 @@ def generate_brute_force(ip):
         "timestamp": datetime.utcnow().isoformat()
     }
 
+def send_log(log):
+    try:
+        response = requests.post(API_URL, json=log)
+        print("Sent log:", response.status_code)
+    except Exception as e:
+        print("Error sending log:", e)
 
 def main():
     port_scan_ip = fake.ipv4()
@@ -52,9 +60,9 @@ def main():
             log = generate_brute_force(brute_force_ip)
 
         print(json.dumps(log))
+        send_log(log)
         time.sleep(0.2)
-        with open("generated_logs.json", "a") as f:
-            f.write(json.dumps(log) + "\n")
+        
 
 
 if __name__ == "__main__":
