@@ -1,4 +1,4 @@
-from faker import Faker # type: ignore
+from faker import Faker 
 import random
 from datetime import datetime
 import json
