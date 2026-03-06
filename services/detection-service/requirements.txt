@@ -2,6 +2,7 @@ redis
 fastapi
 uvicorn
 python-dotenv
+psycopg2-binary
 psycopg[binary]
 scikit-learn
 pandas

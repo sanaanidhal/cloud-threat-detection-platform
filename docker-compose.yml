@@ -1,0 +1,76 @@
+
+services:
+
+  postgres:
+    image: postgres:15
+    container_name: threat-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: asielheleni10
+      POSTGRES_DB: logs
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: threat-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  log-ingestion:
+    build: ./services/log-ingestion
+    container_name: log-ingestion
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:asielheleni10@postgres:5432/logs
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  detection-service:
+    build: ./services/detection-service
+    container_name: detection-service
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://postgres:asielheleni10@postgres:5432/logs
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  alert-service:
+    build: ./services/alert-service
+    container_name: alert-service
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: postgresql://postgres:asielheleni10@postgres:5432/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
