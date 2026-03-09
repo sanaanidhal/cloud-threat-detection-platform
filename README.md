@@ -54,7 +54,7 @@ A production-grade security monitoring platform built with FastAPI microservices
 | Database | PostgreSQL 15 |
 | Event Streaming | Redis 7 Pub/Sub |
 | ML Detection | Scikit-learn (Isolation Forest) |
-| Monitoring | Prometheus |
+| Monitoring | Prometheus + Grafana |
 | Containerization | Docker + Docker Compose |
 | Orchestration (WIP) | Kubernetes |
 | Cloud (WIP) | AWS |
@@ -200,8 +200,8 @@ cloud-threat-detection-platform/
 - [x] Isolation Forest ML anomaly detection
 - [x] Prometheus metrics
 - [x] Docker + Docker Compose
+- [x] Prometheus + Grafana dashboards
 - [ ] Kubernetes deployment
-- [ ] Prometheus + Grafana dashboards
 - [ ] AWS deployment (EC2 / EKS)
 - [ ] GitHub Actions CI/CD pipeline
 
@@ -218,6 +218,18 @@ cloud-threat-detection-platform/
 
 ---
 
+## Dashboard
+
+Real-time security monitoring dashboard built with Grafana and Prometheus.
+
+![Threat Detection Dashboard](docs/dashboard.png)
+
+Panels:
+- **Logs Ingested/Processed per Minute** — pipeline throughput in real time
+- **Total Alerts** — live count of all triggered alerts
+- **Alerts by Attack Type** — breakdown of BRUTE_FORCE, PORT_SCAN, ML_ANOMALY, LARGE_DATA_TRANSFER
+- **Alerts by Severity** — HIGH vs MEDIUM distribution
+- **Average Log Processing Time** — detection engine latency in milliseconds
 ## Environment Variables
 
 Each service reads configuration from environment variables (injected by Docker Compose):
