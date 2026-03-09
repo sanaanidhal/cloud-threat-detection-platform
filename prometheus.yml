@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: "detection-service"
+    static_configs:
+      - targets: ["detection-service:8001"]
+
+  - job_name: "log-ingestion"
+    static_configs:
+      - targets: ["log-ingestion:8000"]

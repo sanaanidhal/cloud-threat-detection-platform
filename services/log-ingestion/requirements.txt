@@ -6,3 +6,4 @@ psycopg[binary]
 pydantic
 redis
 python-dotenv
+prometheus-client
