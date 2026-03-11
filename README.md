@@ -1,47 +1,40 @@
 # Cloud-Native Distributed Threat Detection Platform
 
-A production-grade security monitoring platform built with FastAPI microservices, Redis event streaming, PostgreSQL, and Docker. Detects network threats in real-time using both rule-based logic and an Isolation Forest ML model.
+A production-grade security monitoring platform built with microservices architecture. Ingests network logs in real time, detects threats using both rule-based logic and machine learning, triggers alerts, and visualizes everything through a live Grafana dashboard.
+
+Built as a portfolio project demonstrating distributed systems, ML integration, containerization, and observability engineering.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────┐     HTTP POST      ┌──────────────────────┐
-│  Log Generator  │ ────────────────►  │  Log Ingestion API   │
-│  (Faker-based)  │                    │  FastAPI + SQLAlchemy │
-└─────────────────┘                    └──────────┬───────────┘
-                                                  │
-                                         Store in PostgreSQL
-                                         Publish to Redis
-                                                  │
-                                    ┌─────────────▼────────────┐
-                                    │       Redis Pub/Sub       │
-                                    │      "logs_channel"       │
-                                    └─────────────┬────────────┘
-                                                  │
-                                    ┌─────────────▼────────────┐
-                                    │    Detection Service     │
-                                    │                          │
-                                    │  Rule-Based Detection:   │
-                                    │  • Port Scan (>10 ports) │
-                                    │  • Brute Force (SSH)     │
-                                    │  • Large Data Transfer   │
-                                    │                          │
-                                    │  ML Detection:           │
-                                    │  • Isolation Forest      │
-                                    │  • 12,000 training logs  │
-                                    │                          │
-                                    │  Metrics: Prometheus     │
-                                    └─────────────┬────────────┘
-                                                  │
-                                         Insert alert into DB
-                                                  │
-                                    ┌─────────────▼────────────┐
-                                    │      Alert Service       │
-                                    │   FastAPI + PostgreSQL   │
-                                    │   GET /alerts endpoint   │
-                                    └──────────────────────────┘
+                        ┌─────────────────────────────────────────────────┐
+                        │              Docker / Kubernetes                 │
+                        │                                                  │
+  HTTP POST             │  ┌─────────────────┐    Redis Pub/Sub            │
+─────────────────────►  │  │  Log Ingestion  │ ──────────────────────►    │
+  /logs                 │  │   Service :8000  │                            │
+                        │  └────────┬────────┘    ┌──────────────────┐    │
+                        │           │              │ Detection Service │    │
+                        │           │ PostgreSQL   │     :8001        │    │
+                        │           ▼              │                  │    │
+                        │  ┌─────────────────┐    │ • Port Scan      │    │
+                        │  │   PostgreSQL    │◄───│ • Brute Force    │    │
+                        │  │   :5432         │    │ • Large Transfer │    │
+                        │  └─────────────────┘    │ • ML Anomaly     │    │
+                        │           ▲              └──────────────────┘    │
+                        │           │                                      │
+                        │  ┌─────────────────┐    ┌──────────────────┐    │
+                        │  │  Alert Service  │    │   Prometheus     │    │
+                        │  │    :8002        │    │     :9090        │    │
+                        │  └─────────────────┘    └────────┬─────────┘    │
+                        │                                   │              │
+                        │                         ┌─────────▼─────────┐   │
+                        │                         │     Grafana        │   │
+                        │                         │     :3000          │   │
+                        │                         └───────────────────┘   │
+                        └─────────────────────────────────────────────────┘
 ```
 
 ---
@@ -49,40 +42,34 @@ A production-grade security monitoring platform built with FastAPI microservices
 ## Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
-| API Framework | FastAPI |
+|---|---|
+| API Services | FastAPI + Uvicorn |
 | Database | PostgreSQL 15 |
-| Event Streaming | Redis 7 Pub/Sub |
-| ML Detection | Scikit-learn (Isolation Forest) |
+| Message Broker | Redis Pub/Sub |
+| ML Detection | scikit-learn (Isolation Forest) |
 | Monitoring | Prometheus + Grafana |
 | Containerization | Docker + Docker Compose |
-| Orchestration (WIP) | Kubernetes |
-| Cloud (WIP) | AWS |
+| Orchestration | Kubernetes (manifests in `/k8s`) |
+| Language | Python 3.11 |
 
 ---
 
 ## Services
 
-### Log Ingestion Service (port 8000)
-Receives log events via REST API, stores them in PostgreSQL, and publishes each event to a Redis channel for downstream processing.
+### Log Ingestion Service (`:8000`)
+Receives network log events via HTTP POST. Stores each log in PostgreSQL and publishes it to Redis for downstream processing. Exposes a Prometheus `/metrics` endpoint tracking ingestion throughput.
 
-### Detection Service (port 8001)
-Subscribes to Redis and processes every log in real-time using two detection engines:
+### Detection Service (`:8001`)
+Subscribes to Redis and processes every log through four detection layers:
+- **Port Scan** — flags IPs hitting more than 10 unique ports within 10 seconds
+- **Brute Force** — flags IPs making 6+ SSH (port 22) attempts within 10 seconds
+- **Large Data Transfer** — flags any single transfer exceeding 5,000 bytes
+- **ML Anomaly** — Isolation Forest model trained on port, bytes, and request rate features; detects statistical outliers that rule-based logic would miss
 
-**Rule-Based:**
-- **Port Scan** — flags IPs hitting more than 10 unique ports within a 10-second window
-- **Brute Force** — flags IPs making repeated SSH (port 22) connection attempts
-- **Large Data Transfer** — flags transfers exceeding 5,000 bytes
+When a threat is detected, an alert is written to PostgreSQL with source IP, type, and severity.
 
-**ML-Based:**
-- Isolation Forest model trained on 12,000 synthetic log samples
-- Features: port number, bytes sent, request rate (time-windowed)
-- Flags statistical outliers as anomalies
-
-Exposes Prometheus metrics at `/metrics` including `logs_processed_total` and `alerts_triggered_total` labelled by severity and type.
-
-### Alert Service (port 8002)
-Reads and returns all generated alerts from PostgreSQL via a REST endpoint.
+### Alert Service (`:8002`)
+Read-only API for querying all generated alerts from PostgreSQL.
 
 ---
 
@@ -90,63 +77,69 @@ Reads and returns all generated alerts from PostgreSQL via a REST endpoint.
 
 ### Prerequisites
 - Docker Desktop
-- Git
+- Docker Compose
 
 ### Run the platform
 
 ```bash
-# Clone the repo
 git clone https://github.com/sanaanidhal/cloud-threat-detection-platform.git
 cd cloud-threat-detection-platform
-
-# Start all services
 docker compose up --build
 ```
 
-That's it. Docker starts PostgreSQL, Redis, and all three microservices automatically with health checks and correct startup ordering.
+All 7 containers start automatically: PostgreSQL, Redis, Log Ingestion, Detection Service, Alert Service, Prometheus, and Grafana.
 
-### Verify it's working
+### Send test logs
 
-| Endpoint | Description |
-|----------|-------------|
-| `http://localhost:8000/docs` | Log Ingestion — Swagger UI |
-| `http://localhost:8001/metrics` | Detection Service — Prometheus metrics |
-| `http://localhost:8002/alerts` | Alert Service — all generated alerts |
+Open `http://localhost:8000/docs` and POST to `/logs`. Example payload:
 
-### Send a test log
-
-```bash
-curl -X POST http://localhost:8000/logs \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source_ip": "192.168.1.100",
-    "destination_ip": "10.0.0.5",
-    "port": 22,
-    "protocol": "TCP",
-    "bytes_sent": 150,
-    "timestamp": "2026-01-01T12:00:00"
-  }'
+```json
+{
+  "source_ip": "192.168.1.100",
+  "destination_ip": "10.0.0.1",
+  "port": 22,
+  "bytes_sent": 6000,
+  "protocol": "TCP"
+}
 ```
 
-Send this 6+ times with port 22 and check `http://localhost:8002/alerts` — you will see a `BRUTE_FORCE` alert appear.
+Send 6+ requests with port 22 to trigger a brute force alert. Vary the port across 10+ values to trigger a port scan. Use `bytes_sent > 5000` to trigger a large data transfer alert.
 
-### Simulate realistic traffic
+### View alerts
 
-```bash
-# Run the log generator (requires Python + venv locally)
-cd scripts/log-generator
-pip install -r requirements.txt
-python generator.py
+```
+GET http://localhost:8002/alerts
 ```
 
-### Retrain the ML model
+---
 
-```bash
-cd ml
-python generate_training_data.py
-python train_model.py
-cp model.pkl ../services/detection-service/model.pkl
-```
+## Monitoring Dashboard
+
+Grafana is available at `http://localhost:3000` (login: `admin` / `admin`).
+
+The **Threat Detection Platform** dashboard includes:
+
+| Panel | Query | Description |
+|---|---|---|
+| Logs Ingested per Minute | `rate(logs_ingested_total[2m])` | Ingestion service throughput |
+| Logs Processed per Minute | `rate(logs_processed_total[2m])` | Detection engine throughput |
+| Total Alerts | `sum(alerts_triggered_total)` | Cumulative alert count |
+| Alerts by Attack Type | `alerts_triggered_total` by `type` | BRUTE_FORCE, PORT_SCAN, ML_ANOMALY, LARGE_DATA_TRANSFER |
+| Alerts by Severity | `alerts_triggered_total` by `severity` | HIGH vs MEDIUM distribution |
+| Avg Log Processing Time | histogram ratio | Detection engine latency in ms |
+
+Prometheus scrapes both services every 5 seconds at `/metrics`.
+
+---
+
+## Detection Examples
+
+| Scenario | Rule | Severity |
+|---|---|---|
+| 11 unique ports from one IP in 10s | Port Scan | HIGH |
+| 6 SSH attempts from one IP in 10s | Brute Force | HIGH |
+| Single transfer > 5,000 bytes | Large Data Transfer | MEDIUM |
+| Statistical outlier (Isolation Forest) | ML Anomaly | MEDIUM |
 
 ---
 
@@ -155,89 +148,66 @@ cp model.pkl ../services/detection-service/model.pkl
 ```
 cloud-threat-detection-platform/
 ├── services/
+│   ├── log-ingestion/        # FastAPI ingestion service
+│   ├── detection-service/    # Threat detection + ML inference
+│   └── alert-service/        # Alert query API
+├── k8s/                      # Kubernetes manifests
+│   ├── namespace.yaml
+│   ├── configmap.yaml
+│   ├── secret.yaml
+│   ├── postgres/
+│   ├── redis/
 │   ├── log-ingestion/
-│   │   ├── app/
-│   │   │   ├── main.py          # FastAPI routes
-│   │   │   ├── models.py        # SQLAlchemy models
-│   │   │   ├── schemas.py       # Pydantic schemas
-│   │   │   ├── database.py      # DB connection
-│   │   │   └── redis_client.py  # Redis publisher
-│   │   ├── Dockerfile
-│   │   └── requirements.txt
 │   ├── detection-service/
-│   │   ├── app/
-│   │   │   ├── main.py              # FastAPI app
-│   │   │   ├── redis_subscriber.py  # Event consumer + detection logic
-│   │   │   ├── ml_model.py          # Isolation Forest inference
-│   │   │   └── metrics.py           # Prometheus metrics
-│   │   ├── Dockerfile
-│   │   └── requirements.txt
 │   └── alert-service/
-│       ├── app/
-│       │   └── main.py          # FastAPI routes
-│       ├── Dockerfile
-│       └── requirements.txt
-├── scripts/
-│   └── log-generator/
-│       └── generator.py         # Synthetic traffic generator
-├── ml/
-│   ├── generate_training_data.py
-│   ├── train_model.py
-│   └── training_logs.csv
-├── init.sql                     # Database schema
+├── ml/                       # Model training scripts
+├── scripts/                  # Log generator
 ├── docker-compose.yml
-└── README.md
+├── prometheus.yml
+└── init.sql
 ```
+
+---
+
+## Kubernetes
+
+Production-ready Kubernetes manifests are in `/k8s`. Each service has a `Deployment` and `Service` manifest. Key features:
+
+- **Namespace isolation** — all resources in `threat-detection` namespace
+- **ConfigMap** — non-sensitive config (Redis host, ports, DB name)
+- **Secret** — sensitive values (DB password, connection string)
+- **Readiness probes** — traffic only routes to healthy pods
+- **Resource limits** — CPU and memory bounds on every container
+- **Horizontal scaling** — log-ingestion runs 2 replicas by default
+- **LoadBalancer services** — log-ingestion and alert-service exposed externally
+
+Designed for deployment on AWS EKS. Apply with:
+
+```bash
+kubectl apply -f k8s/
+```
+
+---
+
+## Environment Variables
+
+| Variable | Service | Description |
+|---|---|---|
+| `DATABASE_URL` | ingestion, detection, alert | PostgreSQL connection string |
+| `REDIS_HOST` | ingestion, detection | Redis hostname |
+| `REDIS_PORT` | ingestion, detection | Redis port (default 6379) |
 
 ---
 
 ## Roadmap
 
-- [x] FastAPI microservices
+- [x] Log ingestion service
 - [x] Redis Pub/Sub event streaming
-- [x] PostgreSQL storage
 - [x] Rule-based threat detection
-- [x] Isolation Forest ML anomaly detection
-- [x] Prometheus metrics
-- [x] Docker + Docker Compose
-- [x] Prometheus + Grafana dashboards
-- [ ] Kubernetes deployment
-- [ ] AWS deployment (EC2 / EKS)
-- [ ] GitHub Actions CI/CD pipeline
-
----
-
-## Detection Examples
-
-| Alert Type | Trigger | Severity |
-|-----------|---------|---------|
-| `PORT_SCAN` | >10 unique ports from same IP in 10s | HIGH |
-| `BRUTE_FORCE` | >5 SSH attempts from same IP in 10s | HIGH |
-| `LARGE_DATA_TRANSFER` | bytes_sent > 5000 | MEDIUM |
-| `ML_ANOMALY` | Isolation Forest outlier score | MEDIUM |
-
----
-
-## Dashboard
-
-Real-time security monitoring dashboard built with Grafana and Prometheus.
-
-![Threat Detection Dashboard](docs/dashboard.png)
-
-Panels:
-- **Logs Ingested/Processed per Minute** — pipeline throughput in real time
-- **Total Alerts** — live count of all triggered alerts
-- **Alerts by Attack Type** — breakdown of BRUTE_FORCE, PORT_SCAN, ML_ANOMALY, LARGE_DATA_TRANSFER
-- **Alerts by Severity** — HIGH vs MEDIUM distribution
-- **Average Log Processing Time** — detection engine latency in milliseconds
-## Environment Variables
-
-Each service reads configuration from environment variables (injected by Docker Compose):
-
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_HOST` | Redis hostname |
-| `REDIS_PORT` | Redis port (default 6379) |
-
-> **Note:** Never commit `.env` files. The `docker-compose.yml` injects all required variables at runtime.
+- [x] ML anomaly detection (Isolation Forest)
+- [x] Alert service
+- [x] Docker Compose orchestration
+- [x] Prometheus metrics + Grafana dashboard
+- [x] Kubernetes manifests
+- [ ] AWS EKS deployment
+- [ ] CI/CD pipeline (GitHub Actions)
