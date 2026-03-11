@@ -212,4 +212,4 @@ kubectl apply -f k8s/
 - [x] Prometheus metrics + Grafana dashboard
 - [x] Kubernetes manifests
 - [ ] AWS EKS deployment
-- [ ] CI/CD pipeline (GitHub Actions)
+- [x] CI/CD pipeline (GitHub Actions)
