@@ -1,5 +1,7 @@
 # Cloud-Native Distributed Threat Detection Platform
 
+![CI](https://github.com/sanaanidhal/cloud-threat-detection-platform/actions/workflows/ci.yml/badge.svg)
+
 A production-grade security monitoring platform built with microservices architecture. Ingests network logs in real time, detects threats using both rule-based logic and machine learning, triggers alerts, and visualizes everything through a live Grafana dashboard.
 
 Built as a portfolio project demonstrating distributed systems, ML integration, containerization, and observability engineering.
