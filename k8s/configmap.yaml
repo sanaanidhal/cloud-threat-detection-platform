@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: threat-detection
+data:
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  POSTGRES_DB: "logs"
+  POSTGRES_USER: "postgres"
+  
