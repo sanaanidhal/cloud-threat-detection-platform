@@ -12,29 +12,29 @@ Built as a portfolio project demonstrating distributed systems, ML integration, 
 
 ```
                         ┌─────────────────────────────────────────────────┐
-                        │              Docker / Kubernetes                 │
-                        │                                                  │
-  HTTP POST             │  ┌─────────────────┐    Redis Pub/Sub            │
+                        │              Docker / Kubernetes                │
+                        │                                                 │
+  HTTP POST             │  ┌─────────────────┐    Redis Pub/Sub           │
 ─────────────────────►  │  │  Log Ingestion  │ ──────────────────────►    │
-  /logs                 │  │   Service :8000  │                            │
+  /logs                 │  │   Service :8000 │                            │
                         │  └────────┬────────┘    ┌──────────────────┐    │
-                        │           │              │ Detection Service │    │
-                        │           │ PostgreSQL   │     :8001        │    │
-                        │           ▼              │                  │    │
+                        │           │             │ Detection Service│    │
+                        │           │ PostgreSQL  │     :8001        │    │
+                        │           ▼             │                  │    │
                         │  ┌─────────────────┐    │ • Port Scan      │    │
                         │  │   PostgreSQL    │◄───│ • Brute Force    │    │
                         │  │   :5432         │    │ • Large Transfer │    │
                         │  └─────────────────┘    │ • ML Anomaly     │    │
-                        │           ▲              └──────────────────┘    │
-                        │           │                                      │
+                        │           ▲             └──────────────────┘    │
+                        │           │                                     │
                         │  ┌─────────────────┐    ┌──────────────────┐    │
                         │  │  Alert Service  │    │   Prometheus     │    │
                         │  │    :8002        │    │     :9090        │    │
                         │  └─────────────────┘    └────────┬─────────┘    │
-                        │                                   │              │
+                        │                                  │              │
                         │                         ┌─────────▼─────────┐   │
-                        │                         │     Grafana        │   │
-                        │                         │     :3000          │   │
+                        │                         │     Grafana       │   │
+                        │                         │     :3000         │   │
                         │                         └───────────────────┘   │
                         └─────────────────────────────────────────────────┘
 ```
